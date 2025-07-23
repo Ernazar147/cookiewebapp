@@ -1,19 +1,23 @@
 self.addEventListener("install", event => {
     console.log("Service Worker: Installing...");
     event.waitUntil(
-        caches.open("tookie-cookie-v6").then(cache => {
+        caches.open("tookie-cookie-v8").then(cache => {
             return cache.addAll([
                 "/shop",
                 "/index.html",
                 "https://fonts.googleapis.com/css2?family=Poppins:wght@400;600&display=swap",
                 "https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css",
                 "https://unpkg.com/tailwindcss@2.2.19/dist/tailwind.min.css",
+                "https://cdnjs.cloudflare.com/ajax/libs/tailwindcss/2.2.19/tailwind.min.css",
                 "https://cdn.jsdelivr.net/npm/react@17.0.2/umd/react.production.min.js",
                 "https://unpkg.com/react@17.0.2/umd/react.production.min.js",
+                "https://cdnjs.cloudflare.com/ajax/libs/react/17.0.2/umd/react.production.min.js",
                 "https://cdn.jsdelivr.net/npm/react-dom@17.0.2/umd/react-dom.production.min.js",
                 "https://unpkg.com/react-dom@17.0.2/umd/react-dom.production.min.js",
+                "https://cdnjs.cloudflare.com/ajax/libs/react-dom/17.0.2/umd/react-dom.production.min.js",
                 "https://cdn.jsdelivr.net/npm/@babel/standalone@7.24.6/babel.min.js",
-                "https://unpkg.com/@babel/standalone@7.24.6/babel.min.js"
+                "https://unpkg.com/@babel/standalone@7.24.6/babel.min.js",
+                "https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.24.6/babel.min.js"
             ]);
         })
     );
@@ -56,7 +60,7 @@ self.addEventListener("fetch", event => {
 
 self.addEventListener("activate", event => {
     console.log("Service Worker: Activating...");
-    const cacheWhitelist = ["tookie-cookie-v6"];
+    const cacheWhitelist = ["tookie-cookie-v8"];
     event.waitUntil(
         caches.keys().then(cacheNames => {
             return Promise.all(
