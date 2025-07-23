@@ -584,53 +584,53 @@
                 }
             }, [promoCode, lang, isTelegram]);
 
-            const confirmOrder = useCallback(() => {
-                if (cart.length === 0) {
-                    if (isTelegram) {
-                        window.Telegram.WebApp.showAlert(TEXTS[lang].empty_cart);
-                    } else {
-                        alert(TEXTS[lang].empty_cart);
-                    }
-                    return;
-                }
-                setIsLoading(true);
-                let deliveryType = "Самовывоз";
-                try {
-                    deliveryType = document.querySelector('input[name="delivery"]:checked')?.value || "Самовывоз";
-                } catch (e) {
-                    console.error("Error getting delivery type:", e);
-                }
-                let total = cart.reduce((sum, item) => sum + item.price * item.quantity, 0);
-                if (deliveryType === "Доставка" || deliveryType === "Yetkazib berish") {
-                    total = Math.round(total * 1.12);
-                }
-                total = Math.round(total * (1 - promoDiscount));
-                const orderData = { action: "order", items: cart, delivery_type: deliveryType, total, promo: promoCode || null, user: userData };
-                console.log("Sending order:", JSON.stringify(orderData));
-                setTimeout(() => {
-                    try {
-                        if (isTelegram) {
-                            window.Telegram.WebApp.sendData(JSON.stringify(orderData));
-                            window.Telegram.WebApp.showAlert(TEXTS[lang].order_confirmed || "Заказ оформлен!");
-                        } else {
-                            console.log("Order would be sent:", orderData);
-                            alert(TEXTS[lang].order_confirmed || "Заказ оформлен! (Тестовый режим)");
-                        }
-                        setCart([]);
-                        setPromoCode("");
-                        setPromoDiscount(0);
-                        setShowCart(false);
-                    } catch (e) {
-                        console.error("Error sending order:", e);
-                        if (isTelegram) {
-                            window.Telegram.WebApp.showAlert("Ошибка при отправке заказа! Попробуйте снова.");
-                        } else {
-                            alert("Ошибка при отправке заказа! Попробуйте снова.");
-                        }
-                    }
-                    setIsLoading(false);
-                }, 500);
-            }, [cart, promoCode, promoDiscount, userData, lang, isTelegram]);
+const confirmOrder = useCallback(() => {
+    if (cart.length === 0) {
+        if (isTelegram) {
+            window.Telegram.WebApp.showAlert(TEXTS[lang].empty_cart);
+        } else {
+            alert(TEXTS[lang].empty_cart);
+        }
+        return;
+    }
+    setIsLoading(true);
+    let deliveryType = "Самовывоз";
+    try {
+        deliveryType = document.querySelector('input[name="delivery"]:checked')?.value || "Самовывоз";
+    } catch (e) {
+        console.error("Error getting delivery type:", e);
+    }
+    let total = cart.reduce((sum, item) => sum + item.price * item.quantity, 0);
+    if (deliveryType === "Доставка" || deliveryType === "Yetkazib berish") {
+        total = Math.round(total * 1.12);
+    }
+    total = Math.round(total * (1 - promoDiscount));
+    const orderData = { action: "order", items: cart, delivery_type: deliveryType, total, promo: promoCode || null, user: userData };
+    console.log("Sending order:", JSON.stringify(orderData));
+    setTimeout(() => {
+        try {
+            if (isTelegram) {
+                window.Telegram.WebApp.sendData(JSON.stringify(orderData));
+                window.Telegram.WebApp.close(); // Закрываем веб-приложение
+            } else {
+                console.log("Order would be sent:", orderData);
+                alert(TEXTS[lang].order_confirmed || "Заказ оформлен! (Тестовый режим)");
+            }
+            setCart([]);
+            setPromoCode("");
+            setPromoDiscount(0);
+            setShowCart(false);
+        } catch (e) {
+            console.error("Error sending order:", e);
+            if (isTelegram) {
+                window.Telegram.WebApp.showAlert("Ошибка при отправке заказа! Попробуйте снова.");
+            } else {
+                alert("Ошибка при отправке заказа! Попробуйте снова.");
+            }
+        }
+        setIsLoading(false);
+    }, 500);
+}, [cart, promoCode, promoDiscount, userData, lang, isTelegram]);
 
             const quickOrder = useCallback(() => {
                 if (cart.length === 0) {
