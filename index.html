@@ -17,6 +17,8 @@
     <script src="https://cdn.jsdelivr.net/npm/@babel/standalone@7.24.6/babel.min.js" onerror="handleScriptError('Babel')"></script>
     <script src="https://unpkg.com/@babel/standalone@7.24.6/babel.min.js" onerror="handleScriptError('Babel backup')"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.24.6/babel.min.js" onerror="handleScriptError('Babel cdnjs')"></script>
+    <!-- Добавляем Telegram WebApp SDK -->
+    <script src="https://telegram.org/js/telegram-web-app.js" onerror="handleScriptError('Telegram WebApp SDK')"></script>
     <link rel="manifest" href="/manifest.json">
     <style>
         body {
@@ -171,7 +173,7 @@
         .retry-btn:hover {
             transform: scale(1.05);
         }
-        /* Новые стили для карточек */
+        /* Стили для двух карточек на мобильных */
         @media (max-width: 640px) {
             .cookie-grid {
                 grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -376,38 +378,41 @@
                 console.log("Initializing Tookie Cookie WebApp...");
                 setIsLoading(true);
 
-                const savedUserData = JSON.parse(localStorage.getItem("userData")) || {};
-                let newUserData = {
-                    name: savedUserData.name || "Гость",
-                    phone: savedUserData.phone || "+998901234567",
-                    location: savedUserData.location || "Не указана"
-                };
-
+                // Проверяем, работает ли Telegram WebApp
                 if (window.Telegram && window.Telegram.WebApp) {
-                    console.log("Running in Telegram WebApp environment");
+                    console.log("Telegram WebApp detected!");
                     setIsTelegram(true);
                     Telegram.WebApp.ready();
+                    Telegram.WebApp.expand();
+                    console.log("Telegram WebApp initData:", Telegram.WebApp.initDataUnsafe);
                     const initData = Telegram.WebApp.initDataUnsafe || {};
                     const telegramUser = initData.user || {};
-                    newUserData.name = telegramUser.first_name || newUserData.name;
-                    newUserData.phone = telegramUser.phone_number || newUserData.phone;
+                    console.log("Telegram User Data:", telegramUser);
+
+                    const savedUserData = JSON.parse(localStorage.getItem("userData")) || {};
+                    let newUserData = {
+                        name: telegramUser.first_name || savedUserData.name || "Гость",
+                        phone: telegramUser.phone_number || savedUserData.phone || "+998901234567",
+                        location: savedUserData.location || "Не указана"
+                    };
 
                     if (!newUserData.location || newUserData.location === "Не указана") {
                         if (Telegram.WebApp.requestLocation) {
                             Telegram.WebApp.requestLocation(location => {
                                 if (location) {
                                     newUserData.location = `Широта: ${location.latitude}, Долгота: ${location.longitude}`;
+                                    console.log("Location received:", location);
                                     setUserData(newUserData);
                                     localStorage.setItem("userData", JSON.stringify(newUserData));
                                     Telegram.WebApp.showAlert(TEXTS[lang].profile_loaded);
-                                    console.log("Location received:", location);
                                 } else {
-                                    Telegram.WebApp.showAlert(TEXTS[lang].profile_error);
                                     console.error("Location request failed");
+                                    Telegram.WebApp.showAlert(TEXTS[lang].profile_error);
                                 }
                                 setIsLoading(false);
                             });
                         } else {
+                            console.warn("Location API not available");
                             setUserData(newUserData);
                             localStorage.setItem("userData", JSON.stringify(newUserData));
                             Telegram.WebApp.showAlert(TEXTS[lang].profile_loaded);
@@ -420,11 +425,16 @@
                         setIsLoading(false);
                     }
                 } else {
-                    console.warn("Not running in Telegram WebApp environment. Using test mode.");
+                    console.warn("Telegram WebApp not detected. Running in test mode.");
+                    const savedUserData = JSON.parse(localStorage.getItem("userData")) || {};
+                    let newUserData = {
+                        name: savedUserData.name || "Гость",
+                        phone: savedUserData.phone || "+998901234567",
+                        location: savedUserData.location || "Не указана"
+                    };
                     setUserData(newUserData);
                     localStorage.setItem("userData", JSON.stringify(newUserData));
                     setIsLoading(false);
-                    // Не показываем ошибку сразу, чтобы можно было тестировать
                     alert("Тестовый режим: приложение работает без Telegram. Для полной функциональности открой через Telegram-бот.");
                 }
 
@@ -540,24 +550,24 @@
                 console.log("Applying promo:", promoCode);
                 if (promoCode === "TOOKI10") {
                     setPromoDiscount(0.1);
-                    if (window.Telegram && window.Telegram.WebApp) {
+                    if (isTelegram) {
                         Telegram.WebApp.showAlert(TEXTS[lang].promo_applied || "Промокод применён!");
                     } else {
                         alert(TEXTS[lang].promo_applied || "Промокод применён!");
                     }
                 } else {
                     setPromoDiscount(0);
-                    if (window.Telegram && window.Telegram.WebApp) {
+                    if (isTelegram) {
                         Telegram.WebApp.showAlert(TEXTS[lang].invalid_promo);
                     } else {
                         alert(TEXTS[lang].invalid_promo);
                     }
                 }
-            }, [promoCode, lang]);
+            }, [promoCode, lang, isTelegram]);
 
             const confirmOrder = useCallback(() => {
                 if (cart.length === 0) {
-                    if (window.Telegram && window.Telegram.WebApp) {
+                    if (isTelegram) {
                         Telegram.WebApp.showAlert(TEXTS[lang].empty_cart);
                     } else {
                         alert(TEXTS[lang].empty_cart);
@@ -565,17 +575,29 @@
                     return;
                 }
                 setIsLoading(true);
-                const deliveryType = document.querySelector('input[name="delivery"]:checked').value;
+                let deliveryType;
+                try {
+                    deliveryType = document.querySelector('input[name="delivery"]:checked').value;
+                } catch (e) {
+                    console.error("Error getting delivery type:", e);
+                    deliveryType = "Самовывоз";
+                }
                 let total = cart.reduce((sum, item) => sum + item.price * item.quantity, 0);
                 if (deliveryType === "Доставка" || deliveryType === "Yetkazib berish") {
                     total = Math.round(total * 1.12);
                 }
                 total = Math.round(total * (1 - promoDiscount));
                 const orderData = { action: "order", items: cart, delivery_type: deliveryType, total, promo: promoCode || null, user: userData };
+                console.log("Sending order:", orderData);
                 setTimeout(() => {
                     if (isTelegram) {
-                        Telegram.WebApp.sendData(JSON.stringify(orderData));
-                        Telegram.WebApp.showAlert(TEXTS[lang].order_confirmed || "Заказ оформлен!");
+                        try {
+                            Telegram.WebApp.sendData(JSON.stringify(orderData));
+                            Telegram.WebApp.showAlert(TEXTS[lang].order_confirmed || "Заказ оформлен!");
+                        } catch (e) {
+                            console.error("Error sending order to Telegram:", e);
+                            Telegram.WebApp.showAlert("Ошибка при отправке заказа! Попробуйте снова.");
+                        }
                     } else {
                         console.log("Order would be sent:", orderData);
                         alert(TEXTS[lang].order_confirmed || "Заказ оформлен! (Тестовый режим)");
@@ -591,7 +613,7 @@
 
             const quickOrder = useCallback(() => {
                 if (cart.length === 0) {
-                    if (window.Telegram && window.Telegram.WebApp) {
+                    if (isTelegram) {
                         Telegram.WebApp.showAlert(TEXTS[lang].empty_cart);
                     } else {
                         alert(TEXTS[lang].empty_cart);
@@ -603,10 +625,16 @@
                 let total = cart.reduce((sum, item) => sum + item.price * item.quantity, 0);
                 total = Math.round(total * (1 - promoDiscount));
                 const orderData = { action: "order", items: cart, delivery_type: deliveryType, total, promo: promoCode || null, user: userData };
+                console.log("Sending quick order:", orderData);
                 setTimeout(() => {
                     if (isTelegram) {
-                        Telegram.WebApp.sendData(JSON.stringify(orderData));
-                        Telegram.WebApp.showAlert(TEXTS[lang].order_confirmed || "Заказ оформлен!");
+                        try {
+                            Telegram.WebApp.sendData(JSON.stringify(orderData));
+                            Telegram.WebApp.showAlert(TEXTS[lang].order_confirmed || "Заказ оформлен!");
+                        } catch (e) {
+                            console.error("Error sending quick order to Telegram:", e);
+                            Telegram.WebApp.showAlert("Ошибка при отправке заказа! Попробуйте снова.");
+                        }
                     } else {
                         console.log("Quick order would be sent:", orderData);
                         alert(TEXTS[lang].order_confirmed || "Заказ оформлен! (Тестовый режим)");
@@ -637,8 +665,8 @@
                             Telegram.WebApp.showAlert(TEXTS[lang].profile_updated);
                             console.log("Location received:", location);
                         } else {
-                            Telegram.WebApp.showAlert("Не удалось получить геолокацию!");
                             console.error("Location request failed");
+                            Telegram.WebApp.showAlert("Не удалось получить геолокацию!");
                         }
                     });
                 } else {
@@ -679,8 +707,13 @@
                     setShowProfileForm(false);
                     if (isTelegram) {
                         const profileData = { action: "update_profile", name, phone, location };
-                        Telegram.WebApp.sendData(JSON.stringify(profileData));
-                        Telegram.WebApp.showAlert(TEXTS[lang].profile_updated);
+                        try {
+                            Telegram.WebApp.sendData(JSON.stringify(profileData));
+                            Telegram.WebApp.showAlert(TEXTS[lang].profile_updated);
+                        } catch (e) {
+                            console.error("Error sending profile update to Telegram:", e);
+                            Telegram.WebApp.showAlert("Ошибка при обновлении профиля! Попробуйте снова.");
+                        }
                     } else {
                         console.log("Profile would be updated:", newUserData);
                         alert(TEXTS[lang].profile_updated + " (Тестовый режим)");
@@ -1039,7 +1072,7 @@
                                     <div>
                                         <b>{TEXTS[lang].total}:</b> <span>
                                             {Math.round(cart.reduce((sum, item) => sum + item.price * item.quantity, 0) * 
-                                            (document.querySelector('input[name="delivery"]:checked').value === "Доставка" ? 1.12 : 1) * 
+                                            (document.querySelector('input[name="delivery"]:checked')?.value === "Доставка" ? 1.12 : 1) * 
                                             (1 - promoDiscount))} сум
                                         </span>
                                     </div>
